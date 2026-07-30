@@ -1,0 +1,65 @@
+# 29 julio 2026
+# Código para lenguaje R
+# Implementacion de formula NDC en español
+# Link para corpus (documentos en word) y listado de proyecto CREA (archivos csv)
+# https://www.dropbox.com/scl/fo/1u0wig07c820zupzs4rfa/AP7njUwmtlJA-YLDRAzMpYs?rlkey=ep7gt326gymovcfk15ujlpx3h&st=6ab7oq6e&dl=0
+
+# Librerias necesarias para manejo de texto
+library(quanteda)
+library(readtext)
+library(quanteda.textstats)
+
+# 1. Cargar corpus 
+grupo <- readtext("C:\\Users\\bases de datos\\corpus\\*.docx")
+grupo <- corpus(grupo)
+summary(grupo)
+
+# 2. Promedio de longitud de sentencia: Numero de palabras/numero de sentencias 
+# ASL = Average Sentence Length: number of words / number of sentences
+
+calculo <- textstat_summary(grupo)
+calculo$words <- calculo$tokens - calculo$puncts -calculo$numbers - calculo$symbols - calculo$urls - calculo$symbols - calculo$urls - calculo$tags - calculo$emojis
+calculo$ASL <- calculo$words/calculo$sents
+
+# 3. Número de palabras difíciles que no se encuentran en la lista del proyecto CREA
+# Nwd = number of "difficult" words not matching the DC list of "familiar" words
+
+# 3.1 Cargar lista de palabras de proyecto CREA  
+setwd("C:/Users/Documents/Listado palabras RAE")
+tresmil <- read.csv("3000_diccionario.csv", fileEncoding = "UTF-8")
+cincomil <- read.csv("5000_diccionario.csv", fileEncoding = "UTF-8")
+diezmil <- read.csv("10000_diccionario.csv", fileEncoding = "UTF-8")
+
+mi_diccionario <- dictionary(list(TRESMIL = tresmil$palabra,
+                                  CINCO = cincomil$palabra,
+                                  DIEZMIL = diezmil$palabra))
+
+# 3.2 Encontrar palabras que no están dentro de los diccionarios de RAE
+mi_token <- tokens(grupo)
+mi_dfm <- dfm(mi_token)
+
+resultado <- dfm_lookup(mi_dfm, dictionary = mi_diccionario)
+
+conteos <- convert(resultado, to = "data.frame")
+
+# 4. Unir resultado de conteos para finalizar los cálculos
+indice <- cbind(calculo, conteos)
+
+# 4.1 Cálculos previos
+indice$Nwd_3mil <- indice$words - indice$TRESMIL
+indice$Nwd_5mil <- indice$words - indice$CINCO
+indice$Nwd_10mil <- indice$words - indice$DIEZMIL
+
+# 4.2 Cálculo final. Las columnas DC_ mil contienen los puntajes de la fórmula para 3 mil, 5mil y 10 mil palabras
+indice$DC_3mil <- (64)-(0.95*100*(indice$Nwd_3mil/indice$words)) - (0.69 * (calculo$ASL))
+indice$DC_5mil <- (64)-(0.95*100*(indice$Nwd_5mil/indice$words)) - (0.69 * (calculo$ASL))
+indice$DC_10mil <- (64)-(0.95*100*(indice$Nwd_10mil/indice$words)) - (0.69 * (calculo$ASL))
+
+# Plus: Normalizacion (estandarización mini-max)
+indice$nom1 <- (indice$DC_5mil- min(indice$DC_5mil))/
+  (max(indice$DC_5mil)-min(indice$DC_5mil))
+
+
+# Plus: Normalizacion (estandarización mini-max)
+indice$nom1 <- (indice$DC_5mil- min(indice$DC_5mil))/
+  (max(indice$DC_5mil)-min(indice$DC_5mil))
